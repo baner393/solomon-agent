@@ -1,0 +1,11 @@
+# Copy to config.local.toml and adjust the model and endpoint before a real request.
+# Relative paths resolve from this file, never from the current working directory.
+model = "example-model"
+base_url = "https://api.openai.com/v1"
+api_key_env = "SOLOMON_API_KEY"
+data_dir = ".solomon-data"
+max_output_tokens = 512
+history_char_budget = 6000
+
+[sources]
+sample = "examples/sample-vault"
