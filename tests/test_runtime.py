@@ -1,6 +1,8 @@
 import asyncio
 import json
 
+import pytest
+
 from solomon_agent.knowledge import Evidence
 from solomon_agent.runtime import SYSTEM_PROMPT, DemoRuntime, RespondService
 from solomon_agent.storage import SessionStore
@@ -79,7 +81,13 @@ def test_cancelled_generation_does_not_enter_history(tmp_path):
     asyncio.run(run())
 
 
-def test_pydantic_custom_endpoint_single_openai_stream(tmp_path):
+@pytest.mark.parametrize("auth_mode", ["api_key", "none"])
+@pytest.mark.parametrize("reasoning_effort", [None, "none"])
+def test_pydantic_custom_endpoint_single_openai_stream(
+    tmp_path, auth_mode, reasoning_effort, monkeypatch
+):
+    monkeypatch.setenv("SOLOMON_API_KEY", "fake-global-solomon-key")
+    monkeypatch.setenv("OPENAI_API_KEY", "fake-global-openai-key")
     from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
     from threading import Thread
 
@@ -94,7 +102,7 @@ def test_pydantic_custom_endpoint_single_openai_stream(tmp_path):
 
         def do_POST(self):
             body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
-            calls.append((self.path, body))
+            calls.append((self.path, body, self.headers.get("Authorization")))
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
             self.end_headers()
@@ -120,6 +128,8 @@ def test_pydantic_custom_endpoint_single_openai_stream(tmp_path):
                 tmp_path,
                 model="protocol-test",
                 api_key="test-only",
+                auth_mode=auth_mode,
+                reasoning_effort=reasoning_effort,
                 base_url=f"http://127.0.0.1:{server.server_port}/v1",
             )
         )
@@ -133,6 +143,11 @@ def test_pydantic_custom_endpoint_single_openai_stream(tmp_path):
         assert len(calls) == 1
         assert calls[0][0] == "/v1/chat/completions"
         assert calls[0][1]["stream"] is True
+        if reasoning_effort is None:
+            assert "reasoning_effort" not in calls[0][1]
+        else:
+            assert calls[0][1]["reasoning_effort"] == reasoning_effort
+        assert calls[0][2] == ("Bearer test-only" if auth_mode == "api_key" else None)
     finally:
         server.shutdown()
         server.server_close()

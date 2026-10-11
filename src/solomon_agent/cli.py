@@ -7,6 +7,16 @@ from uuid import uuid4
 from .config import Config
 
 
+def _benchmark_runs(value):
+    try:
+        runs = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError("runs must be an integer from 1 to 100") from None
+    if not 1 <= runs <= 100:
+        raise argparse.ArgumentTypeError("runs must be an integer from 1 to 100")
+    return runs
+
+
 def _main():
     parser = argparse.ArgumentParser(description="Solomon Agent: local knowledge and reply drafts")
     parser.add_argument("--config", type=Path)
@@ -19,17 +29,31 @@ def _main():
     draft.add_argument("--session-id", default="cli")
     draft.add_argument("--mode", choices=["draft", "voice"], default="draft")
     draft.add_argument("--demo", action="store_true")
+    benchmark = sub.add_parser("benchmark")
+    benchmark.add_argument("--runs", type=_benchmark_runs, default=5)
+    benchmark.add_argument("--message", default="请根据已有资料简短介绍 Solomon。")
+    benchmark.add_argument("--mode", choices=["draft", "voice"], default="voice")
+    benchmark.add_argument("--demo", action="store_true")
     sub.add_parser("index")
     sub.add_parser("doctor")
     args = parser.parse_args()
-    config = Config.load(args.config)
+    try:
+        config = Config.load(args.config)
+    except Exception:
+        if args.command == "benchmark":
+            from .benchmark import setup_failure_report
+
+            print(json.dumps(setup_failure_report(args.runs, args.demo), ensure_ascii=False))
+            raise SystemExit(1) from None
+        raise
     if args.command == "doctor":
         print(
             json.dumps(
                 {
                     "model": config.model,
+                    "auth_mode": config.auth_mode,
                     "endpoint_configured": bool(config.base_url),
-                    "api_key_configured": bool(config.api_key),
+                    "api_key_configured": config.auth_mode == "api_key" and bool(config.api_key),
                     "data_dir": str(config.data_dir),
                     "sources": {key: str(value) for key, value in config.sources.items()},
                 },
@@ -40,6 +64,32 @@ def _main():
         from .knowledge import MarkdownKnowledgeProvider
 
         print(json.dumps(MarkdownKnowledgeProvider(config.sources, config.data_dir).index()))
+    elif args.command == "benchmark":
+        from .api import build_service
+        from .benchmark import run_benchmark, setup_failure_report
+
+        async def measure():
+            try:
+                service = build_service(config, args.demo)
+            except Exception:
+                return setup_failure_report(args.runs, args.demo)
+            try:
+                report = await run_benchmark(
+                    service, args.message, args.runs, args.mode, simulation=args.demo
+                )
+            except Exception:
+                report = setup_failure_report(args.runs, args.demo)
+            try:
+                await service.runtime.close()
+            except Exception:
+                report["error_count"] += 1
+                report["error_code"] = "runtime_cleanup_failed"
+            return report
+
+        report = asyncio.run(measure())
+        print(json.dumps(report, ensure_ascii=False))
+        if report["error_count"]:
+            raise SystemExit(1)
     elif args.command == "serve":
         import uvicorn
 

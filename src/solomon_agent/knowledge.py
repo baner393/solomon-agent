@@ -94,6 +94,8 @@ class MarkdownKnowledgeProvider:
 
         for source_id, root in self.sources.items():
             for directory, subdirs, filenames in os.walk(root, onerror=scan_error):
+                subdirs[:] = [name for name in subdirs if not name.startswith(".")]
+                filenames = [name for name in filenames if not name.startswith(".")]
                 folder = Path(directory)
                 for name in subdirs + filenames:
                     candidate = folder / name
@@ -108,6 +110,8 @@ class MarkdownKnowledgeProvider:
                     resolved = path.resolve(strict=True)
                     if not resolved.is_relative_to(root):
                         raise ValueError(f"Knowledge file escapes configured source: {path}")
+                    if any(part.startswith(".") for part in resolved.relative_to(root).parts):
+                        continue
                     if not resolved.is_file():
                         continue
                     locator = path.relative_to(root).as_posix()

@@ -12,7 +12,7 @@
 - 本地 FastAPI SSE 接口、按请求取消及来源依据。
 - 明确标注的离线演示，配套测试与学习练习。
 
-当前运行时采用可替换适配器，首轮采用 PydanticAI。Pi 比较结果和限制见架构说明。真实 SenseNova 兼容性、数字人端到端首音延迟与原生 Windows 尚需单独验收；离线演示不证明它们达标。
+当前运行时采用可替换适配器，首轮采用 PydanticAI。Pi 比较结果和限制见架构说明。本机无密钥代理的真实模型联通已通过；整体回答质量、数字人端到端首音延迟与原生 Windows 尚需单独验收；离线演示不证明它们达标。
 
 ## 在 WSL Ubuntu 开始
 
@@ -32,7 +32,7 @@ cp config.example.toml config.local.toml
 
 `--demo` 使用本地模拟生成器，不调用真实模型，输出用于验证检索、引用和流式链路。
 
-真实运行时，在本地配置设置模型名、base_url，并通过 `SOLOMON_API_KEY` 环境变量提供密钥。不要把密钥写进源码或提交配置。详见 [安装与运行](docs/SETUP.md)。
+真实运行时，在本地配置设置模型名、base_url，默认通过 `SOLOMON_API_KEY` 环境变量提供密钥；无需认证的本地代理显式设置 `auth_mode = "none"`。不要把密钥写进源码或提交配置。详见 [安装与运行](docs/SETUP.md)。
 
 ## 文档
 
@@ -41,6 +41,7 @@ cp config.example.toml config.local.toml
 - [安装与运行](docs/SETUP.md)
 - [第一轮学习练习](docs/LEARNING.md)
 - [首轮验证与下一步](docs/VALIDATION.md)
+- [真实知识源与延迟验收](docs/ROUND2.md)
 - [贡献与检查](CONTRIBUTING.md)
 - [第三方组件](THIRD_PARTY_NOTICES.md)
 
