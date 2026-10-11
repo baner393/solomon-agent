@@ -13,20 +13,33 @@ SYSTEM_PROMPT = """你是 Solomon，帮助用户理解消息并草拟回复。�
 class PydanticRuntime:
     def __init__(self, config):
         config.require_model()
-        from openai import AsyncOpenAI
+        from openai import AsyncOpenAI, Omit
         from pydantic_ai import Agent
         from pydantic_ai.models.openai import OpenAIChatModel
         from pydantic_ai.providers.openai import OpenAIProvider
 
         self.client = AsyncOpenAI(
-            api_key=config.api_key, base_url=config.base_url, max_retries=0, timeout=30
+            api_key=config.api_key if config.auth_mode == "api_key" else "solomon-no-auth",
+            base_url=config.base_url,
+            max_retries=0,
+            timeout=30,
+            default_headers={"Authorization": Omit()} if config.auth_mode == "none" else {},
         )
         model = OpenAIChatModel(config.model, provider=OpenAIProvider(openai_client=self.client))
         self.agent = Agent(
             model,
             instructions=SYSTEM_PROMPT,
             retries=0,
-            model_settings={"max_tokens": config.max_output_tokens},
+            model_settings={
+                "max_tokens": config.max_output_tokens,
+                **(
+                    {"openai_reasoning_effort": config.reasoning_effort}
+                    if config.reasoning_effort is not None
+                    else {}
+                ),
+                # Current OpenAI SDK validates explicit omission per request.
+                "extra_headers": {"Authorization": Omit()} if config.auth_mode == "none" else {},
+            },
         )
 
     async def stream(self, prompt):

@@ -136,3 +136,42 @@ def test_unreadable_subdirectory_never_deletes_old_index(tmp_path):
     finally:
         nested.chmod(0o700)
     assert provider.index()["removed"] == 0
+
+
+def test_hidden_metadata_trash_and_hidden_symlink_targets_are_excluded(tmp_path):
+    root = tmp_path / "vault"
+    root.mkdir()
+    for name in [".git", ".kb", ".trash", ".obsidian", "visible/.private"]:
+        folder = root / name
+        folder.mkdir(parents=True)
+        (folder / "note.md").write_text("# Private\nhiddenmarker", encoding="utf-8")
+    (root / ".hidden.md").write_text("hiddenmarker", encoding="utf-8")
+    (root / "kept.md").write_text("# Public\npublicmarker", encoding="utf-8")
+    (root / "alias.md").symlink_to(root / ".trash" / "note.md")
+    provider = MarkdownKnowledgeProvider({"kb": root}, tmp_path / "data")
+    assert provider.index()["documents"] == 1
+    assert not provider.search("hiddenmarker")
+    assert provider.search("publicmarker")
+
+
+def test_existing_index_entries_moved_to_trash_are_removed(tmp_path):
+    root = tmp_path / "vault"
+    root.mkdir()
+    note = root / "note.md"
+    note.write_text("# Visible\narchivedmarker", encoding="utf-8")
+    provider = MarkdownKnowledgeProvider({"kb": root}, tmp_path / "data")
+    provider.index()
+    trash = root / ".trash"
+    trash.mkdir()
+    note.rename(trash / "note.md")
+    assert provider.index() == {"updated": 0, "removed": 1, "documents": 0}
+    assert not provider.search("archivedmarker")
+
+
+def test_source_inside_hidden_parent_still_indexes_visible_notes(tmp_path):
+    root = tmp_path / ".private-home" / "vault"
+    root.mkdir(parents=True)
+    (root / "visible.md").write_text("# Visible\nnormalmarker", encoding="utf-8")
+    provider = MarkdownKnowledgeProvider({"kb": root}, tmp_path / "data")
+    assert provider.index()["documents"] == 1
+    assert provider.search("normalmarker")

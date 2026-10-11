@@ -3,9 +3,11 @@
 model = "example-model"
 base_url = "https://api.openai.com/v1"
 api_key_env = "SOLOMON_API_KEY"
+auth_mode = "api_key" # Set to "none" only for an explicitly configured service without authentication.
 data_dir = ".solomon-data"
 max_output_tokens = 512
 history_char_budget = 6000
+# reasoning_effort = "none" # Optional; only use after verifying support and answer quality.
 
 [sources]
 sample = "examples/sample-vault"

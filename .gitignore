@@ -23,3 +23,5 @@ config.local.toml
 .solomon-agent/
 *.sqlite3-*
 *.db-journal
+
+.solomon-data-existing/
